@@ -195,32 +195,31 @@ function initializeAQIChart() {
     const ctx = document.getElementById('aqiComparisonChart').getContext('2d');
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    // Enhanced AQI data with more realistic seasonal variations
-    const withoutRotationData = [165, 175, 190, 185, 170, 160, 165, 175, 190, 210, 205, 180];
-    const withRotationData = [120, 125, 130, 125, 115, 110, 115, 120, 135, 150, 140, 130];
+    // Initialize with empty data - will be updated when recommendations are generated
+    const emptyData = Array(12).fill(null);
 
     const gradientWithout = ctx.createLinearGradient(0, 0, 0, 400);
-    gradientWithout.addColorStop(0, 'rgba(255, 192, 203, 0.6)');
-    gradientWithout.addColorStop(1, 'rgba(255, 192, 203, 0.1)');
+    gradientWithout.addColorStop(0, 'rgba(255, 99, 71, 0.6)');  // Red for not following
+    gradientWithout.addColorStop(1, 'rgba(255, 99, 71, 0.1)');
 
     const gradientWith = ctx.createLinearGradient(0, 0, 0, 400);
-    gradientWith.addColorStop(0, 'rgba(173, 216, 230, 0.6)');
-    gradientWith.addColorStop(1, 'rgba(173, 216, 230, 0.1)');
+    gradientWith.addColorStop(0, 'rgba(46, 204, 113, 0.6)');  // Green for following
+    gradientWith.addColorStop(1, 'rgba(46, 204, 113, 0.1)');
 
-    return new Chart(ctx, {
+    window.aqiChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: months,
             datasets: [
                 {
-                    label: 'Without Crop Rotation',
-                    data: withoutRotationData,
-                    borderColor: 'rgba(255, 182, 193, 1)',
+                    label: 'Without Following Recommendations',
+                    data: emptyData,
+                    borderColor: 'rgba(255, 99, 71, 1)',
                     backgroundColor: gradientWithout,
                     tension: 0.4,
                     fill: true,
                     pointBackgroundColor: '#fff',
-                    pointBorderColor: 'rgba(255, 182, 193, 1)',
+                    pointBorderColor: 'rgba(255, 99, 71, 1)',
                     pointHoverBackgroundColor: '#fff',
                     pointBorderWidth: 2,
                     pointHoverBorderWidth: 2,
@@ -230,14 +229,14 @@ function initializeAQIChart() {
                     order: 2
                 },
                 {
-                    label: 'With Crop Rotation',
-                    data: withRotationData,
-                    borderColor: 'rgba(173, 216, 230, 1)',
+                    label: 'Following Recommendations',
+                    data: emptyData,
+                    borderColor: 'rgba(46, 204, 113, 1)',
                     backgroundColor: gradientWith,
                     tension: 0.4,
                     fill: true,
                     pointBackgroundColor: '#fff',
-                    pointBorderColor: 'rgba(173, 216, 230, 1)',
+                    pointBorderColor: 'rgba(46, 204, 113, 1)',
                     pointHoverBackgroundColor: '#fff',
                     pointBorderWidth: 2,
                     pointHoverBorderWidth: 2,
@@ -262,7 +261,7 @@ function initializeAQIChart() {
             plugins: {
                 title: {
                     display: true,
-                    text: 'Annual AQI Levels Comparison',
+                    text: 'Projected AQI Impact Analysis',
                     align: 'center',
                     font: {
                         size: 18,
@@ -335,8 +334,14 @@ function initializeAQIChart() {
                             return value + ' AQI';
                         }
                     },
-                    border: {
-                        display: false
+                    title: {
+                        display: true,
+                        text: 'Air Quality Index (AQI)',
+                        color: '#666',
+                        font: {
+                            size: 12,
+                            family: "'Arial', sans-serif"
+                        }
                     }
                 },
                 x: {
@@ -352,23 +357,80 @@ function initializeAQIChart() {
                         padding: 5,
                         color: '#999'
                     },
-                    border: {
-                        display: false
+                    title: {
+                        display: true,
+                        text: 'Months',
+                        color: '#666',
+                        font: {
+                            size: 12,
+                            family: "'Arial', sans-serif"
+                        }
                     }
                 }
-            },
-            elements: {
-                line: {
-                    borderCapStyle: 'round',
-                    borderJoinStyle: 'round'
-                }
-            },
-            interaction: {
-                mode: 'index',
-                intersect: false
             }
         }
     });
+    return window.aqiChart;
+}
+
+// Function to update chart with recommendation impact
+function updateAQIChartWithRecommendations(cropInfo) {
+    if (!window.aqiChart) return;
+
+    // Base AQI values for different seasons
+    const seasonalBaseAQI = {
+        winter: 120,  // Oct-Feb
+        summer: 150,  // Mar-Jun
+        monsoon: 90   // Jul-Sep
+    };
+
+    // Calculate AQI impact based on crop type and rotation
+    const getAQIImpact = (month, isFollowing) => {
+        let baseAQI;
+        
+        // Determine season's base AQI
+        if ([10, 11, 12, 1, 2].includes(month)) baseAQI = seasonalBaseAQI.winter;
+        else if ([3, 4, 5, 6].includes(month)) baseAQI = seasonalBaseAQI.summer;
+        else baseAQI = seasonalBaseAQI.monsoon;
+
+        if (isFollowing) {
+            // Reduction factors for following recommendations
+            const reductionFactors = {
+                rice: 0.3,    // 30% reduction
+                wheat: 0.25,
+                sugarcane: 0.35,
+                pulses: 0.4,
+                cotton: 0.3,
+                groundnut: 0.35,
+                maize: 0.3,
+                sorghum: 0.35,
+                'pearl-millet': 0.3,
+                chickpea: 0.4,
+                mustard: 0.25,
+                moong: 0.4
+            };
+
+            const reductionFactor = reductionFactors[cropInfo.previousCrop] || 0.3;
+            return baseAQI * (1 - reductionFactor);
+        } else {
+            // Increase factors for not following recommendations
+            return baseAQI * (1 + 0.2 + (Math.random() * 0.2)); // 20-40% increase
+        }
+    };
+
+    // Generate data for both scenarios
+    const withoutFollowingData = [];
+    const followingRecommendationsData = [];
+
+    for (let month = 1; month <= 12; month++) {
+        withoutFollowingData.push(getAQIImpact(month, false));
+        followingRecommendationsData.push(getAQIImpact(month, true));
+    }
+
+    // Update chart data
+    window.aqiChart.data.datasets[0].data = withoutFollowingData;
+    window.aqiChart.data.datasets[1].data = followingRecommendationsData;
+    window.aqiChart.update();
 }
 
 // Initialize AQI Gauge
@@ -968,6 +1030,9 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const aiRecommendations = await getGroqRecommendations(formData);
             
+            // Update the chart with the new data
+            updateAQIChartWithRecommendations(formData);
+
             // Process the recommendations to replace crop names with local names
             const processedRecommendations = aiRecommendations.split('\n').map(line => {
                 // Special handling for year headers
@@ -993,12 +1058,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     const localName = cropNameMap[match.toLowerCase()];
                     if (localName) {
+                        // Check if the line already contains this local name
+                        if (line.includes(localName)) {
+                            return match; // Don't replace if local name already exists
+                        }
                         // Mark this region as replaced
                         replacedParts.add(offset);
                         // Only return the local name if it's not already in the format "Crop (Local)"
                         return line.slice(offset).startsWith(localName) ? match : localName;
                     }
                     return match;
+                });
+                
+                // Additional cleanup to remove any remaining duplicates
+                Object.entries(cropNameMap).forEach(([crop, localName]) => {
+                    const duplicatePattern = new RegExp(`${localName}/${localName}|${localName}\\s*${localName}`, 'g');
+                    line = line.replace(duplicatePattern, localName);
                 });
                 
                 // Format the line based on its type
